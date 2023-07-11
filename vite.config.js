@@ -38,7 +38,13 @@ export default defineConfig(({ mode }) => {
                     // your javascript-obfuscator options
                     // debugProtection: true,
                     // ...  [See more options](https://github.com/javascript-obfuscator/javascript-obfuscator)
-                    domainLock: ['.dado.tw', 'localhost'],
+                    domainLock: [
+                        '.dado.tw',
+                        '.botp.io',
+                        '.auo.to',
+                        'localhost',
+                        'businesscard-8ni.pages.dev',
+                    ],
                     domainLockRedirectUrl: 'about:blank',
                     // http://127.0.0.1:5500/dist/index.html
                     // http://localhost:5500/dist/index.html
