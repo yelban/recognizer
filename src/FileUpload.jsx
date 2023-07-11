@@ -47,25 +47,71 @@ function FileUpload() {
         }
 
         const result = await response.json();
-        console.log(`File uploaded successfully: ${result}`);
+        console.log('File uploaded successfully: ', result);
         setCardInfo(result.analyzeResult.documentResults[0].fields);
         setCardUrl(result.cardUrl);
     };
 
     const startCamera = async () => {
         try {
-            const stream = await navigator.mediaDevices.getUserMedia({ video: true });
-            videoRef.current.srcObject = stream;
-            videoRef.current.play();
-            setCameraStarted(true);
+            const stream = await navigator.mediaDevices
+                .getUserMedia({
+                    video: {
+                        width: { ideal: 1080 },
+                        height: { ideal: 1080 },
+                        // width: { min: 1024 },
+                        // height: { min: 768 },
+                        facingMode: { exact: 'environment' },
+                    },
+                })
+                .then((stream) => {
+                    videoRef.current.srcObject = stream;
+                    videoRef.current.play();
+
+                    setCameraStarted(true);
+                })
+                .catch((err) => {
+                    // 如果使用後鏡頭失敗，嘗試使用前鏡頭
+                    navigator.mediaDevices
+                        .getUserMedia({
+                            video: {
+                                facingMode: 'user',
+                            },
+                        })
+                        .then((stream) => {
+                            videoRef.current.srcObject = stream;
+                            videoRef.current.play();
+
+                            setCameraStarted(true);
+                        })
+                        .catch((err) => {
+                            console.log(err);
+                        });
+                });
+
+            // videoRef.current.srcObject = stream;
+            // videoRef.current.play();
+            // setCameraStarted(true);
         } catch (err) {
             console.error('Error accessing the camera', err);
         }
     };
 
     const capturePhoto = async () => {
+        console.log(videoRef.current.videoWidth, videoRef.current.videoHeight);
+
+        // Set canvas size to match video size
+        canvasRef.current.width = videoRef.current.videoWidth;
+        canvasRef.current.height = videoRef.current.videoHeight;
+
         const context = canvasRef.current.getContext('2d');
-        context.drawImage(videoRef.current, 0, 0, 800, 600);
+        context.drawImage(
+            videoRef.current,
+            0,
+            0,
+            videoRef.current.videoWidth,
+            videoRef.current.videoHeight
+        );
 
         // Pause the video stream
         videoRef.current.pause();
@@ -105,7 +151,7 @@ function FileUpload() {
             }
 
             const result = await response.json();
-            console.log(`File uploaded successfully: ${result}`);
+            console.log('File uploaded successfully: ', result);
             setCardInfo(result.analyzeResult.documentResults[0].fields);
             setCardUrl(result.cardUrl);
         });
@@ -139,8 +185,8 @@ function FileUpload() {
                 <button onClick={uploadFile}>Upload</button>
             </div>
 
-            <video ref={videoRef} width='800' height='600' />
-            <canvas ref={canvasRef} width='800' height='600' style={{ display: 'none' }} />
+            <video ref={videoRef} style={{ width: '100%', height: 'auto' }} />
+            <canvas ref={canvasRef} style={{ display: 'none' }} />
 
             {cardUrl && (
                 <div>
