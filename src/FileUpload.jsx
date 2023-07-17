@@ -157,6 +157,10 @@ function FileUpload() {
         });
     };
 
+    const handleButtonClick = () => {
+        fileInput.current.click();
+    };
+
     return (
         <div>
             {showFlash && (
@@ -181,7 +185,14 @@ function FileUpload() {
                 <button onClick={capturePhoto} disabled={!cameraStarted}>
                     Capture Photo
                 </button>
-                <input type='file' accept='image/*' ref={fileInput} capture='camera' />
+                <input
+                    type='file'
+                    accept='image/*'
+                    ref={fileInput}
+                    capture='camera'
+                    style={{ display: 'none' }}
+                />
+                <button onClick={handleButtonClick}>掃描名片</button>
                 <button onClick={uploadFile}>Upload</button>
             </div>
 
