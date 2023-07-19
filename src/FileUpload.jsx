@@ -2,40 +2,32 @@ import './FileUpload.css';
 
 import React, { useEffect, useRef, useState } from 'react';
 
-import shutterSoundFile from './assets/technology_camera_shutter_release_nikon_f4_002.mp3';
-
+// 這是主要的元件，用於處理檔案上傳和顯示上傳的結果
 function FileUpload() {
-    const fileInput = useRef();
-    const [cardInfo, setCardInfo] = useState(null);
-    const [cardUrl, setCardUrl] = useState(null);
-    const videoRef = useRef();
-    const canvasRef = useRef();
-    const [cameraStarted, setCameraStarted] = useState(false);
-    const [showFlash, setShowFlash] = useState(false);
-    const shutterSound = useRef(new Audio(shutterSoundFile));
+    const fileInput = useRef(); // 這是一個引用 (reference)，指向 input 標籤，可以用來讀取檔案
 
-    useEffect(() => {
-        // After `showFlash` is set to `true`, set it back to `false` after 500 milliseconds
-        if (showFlash) {
-            const timer = setTimeout(() => setShowFlash(false), 250);
-            return () => clearTimeout(timer); // Clean up the timeout when unmounting the component
-        }
-    }, [showFlash]);
-
-    useEffect(() => {
-        shutterSound.current.load();
-    }, []);
+    const [cardInfo, setCardInfo] = useState(null); // 這個狀態變數用於儲存卡片的資訊
+    const [cardUrl, setCardUrl] = useState(null); // 這個狀態變數用於儲存卡片圖片的 URL
+    const [uploading, setUploading] = useState(false); // 這個狀態變數用於追蹤是否正在上傳檔案
+    const [fileSelected, setFileSelected] = useState(false); // 這個狀態變數用於追蹤是否已選擇檔案
+    const [selectedImage, setSelectedImage] = useState(null); // 這個狀態變數用於儲存被選擇的圖片的 URL
 
     const uploadFile = async () => {
-        const file = fileInput.current.files[0];
+        setUploading(true); // 將 uploading 設為 true，表示正在上傳檔案
+
+        const file = fileInput.current.files[0]; // 從 fileInput 讀取檔案
         if (!file) {
             alert('No file selected');
+            setUploading(false); // 如果沒有選擇檔案，停止上傳並提前結束函數
             return;
         }
 
         const formData = new FormData();
-        formData.append('file', file);
+        formData.append('file', file); // 將檔案加入 formData 中
 
+        setCardInfo(null); // 在等待回傳資訊的時候清除 cardInfo 內容
+
+        // 使用 fetch 函數上傳檔案
         const response = await fetch('https://abcorc.twampd.workers.dev', {
             method: 'POST',
             body: formData,
@@ -43,181 +35,182 @@ function FileUpload() {
 
         if (!response.ok) {
             alert('Upload failed');
+            setUploading(false); // 如果回傳錯誤，停止上傳並提前結束函數
             return;
         }
 
-        const result = await response.json();
-        console.log('File uploaded successfully: ', result);
-        setCardInfo(result.analyzeResult.documentResults[0].fields);
-        setCardUrl(result.cardUrl);
-    };
-
-    const startCamera = async () => {
+        // 處理回傳的資訊
         try {
-            const stream = await navigator.mediaDevices
-                .getUserMedia({
-                    video: {
-                        width: { ideal: 1080 },
-                        height: { ideal: 1080 },
-                        // width: { min: 1024 },
-                        // height: { min: 768 },
-                        facingMode: { exact: 'environment' },
-                    },
-                })
-                .then((stream) => {
-                    videoRef.current.srcObject = stream;
-                    videoRef.current.play();
-
-                    setCameraStarted(true);
-                })
-                .catch((err) => {
-                    // 如果使用後鏡頭失敗，嘗試使用前鏡頭
-                    navigator.mediaDevices
-                        .getUserMedia({
-                            video: {
-                                facingMode: 'user',
-                            },
-                        })
-                        .then((stream) => {
-                            videoRef.current.srcObject = stream;
-                            videoRef.current.play();
-
-                            setCameraStarted(true);
-                        })
-                        .catch((err) => {
-                            console.log(err);
-                        });
-                });
-
-            // videoRef.current.srcObject = stream;
-            // videoRef.current.play();
-            // setCameraStarted(true);
-        } catch (err) {
-            console.error('Error accessing the camera', err);
-        }
-    };
-
-    const capturePhoto = async () => {
-        console.log(videoRef.current.videoWidth, videoRef.current.videoHeight);
-
-        // Set canvas size to match video size
-        canvasRef.current.width = videoRef.current.videoWidth;
-        canvasRef.current.height = videoRef.current.videoHeight;
-
-        const context = canvasRef.current.getContext('2d');
-        context.drawImage(
-            videoRef.current,
-            0,
-            0,
-            videoRef.current.videoWidth,
-            videoRef.current.videoHeight
-        );
-
-        // Pause the video stream
-        videoRef.current.pause();
-        videoRef.current.srcObject.getTracks()[0].stop();
-
-        // Show the flash
-        setShowFlash(true);
-
-        // Play the shutter sound
-        shutterSound.current.play();
-        //
-        // const shutterSound = new Audio(shutterSoundFile);
-        // shutterSound.play();
-        //
-        // const shutterSound = document.getElementById('shutterSound');
-        // if (shutterSound.readyState >= 3) {
-        //     // HAVE_FUTURE_DATA or HAVE_ENOUGH_DATA
-        //     shutterSound.play();
-        // } else {
-        //     console.warn('Sound not ready');
-        // }
-
-        canvasRef.current.toBlob(async (blob) => {
-            const formData = new FormData();
-            formData.append('file', blob, 'photo.jpg');
-
-            // alert('Upload successful');
-
-            const response = await fetch('https://abcorc.twampd.workers.dev', {
-                method: 'POST',
-                body: formData,
-            });
-
-            if (!response.ok) {
-                alert('Upload failed');
-                return;
-            }
-
             const result = await response.json();
             console.log('File uploaded successfully: ', result);
-            setCardInfo(result.analyzeResult.documentResults[0].fields);
+
+            // 清除舊的卡片 URL
+            if (cardUrl) {
+                URL.revokeObjectURL(cardUrl);
+            }
+
+            // 清除被選擇的圖片，設置卡片資訊和卡片 URL
+            setSelectedImage(null);
+            setCardInfo(result.analyzeResult.documents[0].fields);
             setCardUrl(result.cardUrl);
-        });
+        } catch (error) {
+            console.error('Error uploading file', error);
+        }
+
+        setUploading(false); // 完成上傳後將 uploading 設為 false
+
+        setFileSelected(false); // 重設 fileSelected 狀態
+
+        fileInput.current.value = '';
+        // 因為 fileInput 的 value 在每次上傳後沒有被清除。
+        // 當您選擇相同的檔案時，onChange 事件不會觸發，因為從技術上來說，輸入的值並沒有改變。
+        // 這就是為什麼 Upload 按鈕看起來沒有重新啟用，也沒有新的預覽圖像產生。
     };
 
     const handleButtonClick = () => {
-        fileInput.current.click();
+        fileInput.current.click(); // 當按鈕被點擊時，觸發 fileInput 的點擊事件
+    };
+
+    const handleFileChange = (e) => {
+        // 當檔案被選擇時，設置 fileSelected 狀態，並將被選擇的圖片的 URL 設為 selectedImage
+        setFileSelected(e.target.files.length > 0);
+        setSelectedImage(URL.createObjectURL(e.target.files[0]));
     };
 
     return (
+        // 畫面的主要元件
+        // 包含掃描名片按鈕、上傳按鈕、圖片預覽和名片資訊
         <div>
-            {showFlash && (
-                <div
-                    id='flash'
-                    style={{
-                        animation: 'flash 0.25s',
-                        backgroundColor: 'white',
-                        position: 'absolute',
-                        top: 0,
-                        left: 0,
-                        width: '100%',
-                        height: '100%',
-                    }}
-                />
-            )}
-
+            {/* 省略了一些並未使用到的元件和狀態變數，例如 showFlash */}
             <div>
-                <button onClick={startCamera} disabled={cameraStarted}>
-                    Start Camera
-                </button>
-                <button onClick={capturePhoto} disabled={!cameraStarted}>
-                    Capture Photo
-                </button>
                 <input
                     type='file'
                     accept='image/*'
                     ref={fileInput}
-                    capture='camera'
+                    // capture='camera'
                     style={{ display: 'none' }}
+                    onChange={handleFileChange}
                 />
-                <button onClick={handleButtonClick}>掃描名片</button>
-                <button onClick={uploadFile}>Upload</button>
+                <button
+                    onClick={handleButtonClick}
+                    className='bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded w-[150px]'
+                    type='button'>
+                    Scan Card
+                </button>
+                <button
+                    onClick={uploadFile}
+                    disabled={!fileSelected}
+                    className={`${
+                        fileSelected ? 'bg-green-500 hover:bg-green-700' : 'bg-gray-300'
+                    } text-white font-bold py-2 px-4 rounded ml-2 w-[150px]`}
+                    type='button'>
+                    Recognize
+                </button>
             </div>
 
-            <video ref={videoRef} style={{ width: '100%', height: 'auto' }} />
-            <canvas ref={canvasRef} style={{ display: 'none' }} />
-
-            {cardUrl && (
-                <div>
-                    <img src={cardUrl} alt='Business Card' style={{ maxWidth: '250px' }} />
+            {/* 顯示被選擇的圖片或卡片圖片 */}
+            {(selectedImage || cardUrl) && (
+                <div className='mt-4 relative'>
+                    <img
+                        src={selectedImage || cardUrl}
+                        className='max-w-screen sm:max-h-[300px] rounded shadow-lg'
+                        alt='Captured'
+                    />
+                    {/* 如果正在上傳，顯示一個 spinner */}
+                    {uploading && <div className='loader' />}
                 </div>
             )}
 
+            {/* 顯示卡片資訊 */}
             {cardInfo && (
-                <div>
-                    <h2>名片資訊</h2>
-                    <p>公司名稱: {cardInfo.CompanyNames?.valueArray[0]?.valueString}</p>
-                    <p>
-                        姓名:{' '}
-                        {`${cardInfo.ContactNames?.valueArray[0]?.valueObject.FirstName.valueString} ${cardInfo.ContactNames?.valueArray[0]?.valueObject.LastName.valueString}`}
-                    </p>
-                    <p>職稱: {cardInfo.JobTitles?.valueArray[0]?.valueString}</p>
-                    <p>公司電話: {cardInfo.WorkPhones?.valueArray[0]?.text}</p>
-                    <p>傳真: {cardInfo.Faxes?.valueArray[0]?.text}</p>
-                    <p>地址: {cardInfo.Addresses?.valueArray[0]?.valueString}</p>
-                    <p>網址: {cardInfo.Websites?.valueArray[0]?.valueString}</p>
+                <div className='mt-4'>
+                    <h2 className='mb-2 text-xl font-bold text-blue-500'>
+                        Business card information.
+                    </h2>
+                    <table className='min-w-full divide-y divide-gray-200'>
+                        <tbody className='bg-white divide-y divide-gray-200'>
+                            <tr>
+                                <td className='py-2 whitespace-nowrap text-sm text-gray-500'>
+                                    Company name
+                                </td>
+                                <td className='px-2 py-2 whitespace-normal text-sm text-gray-500'>
+                                    {cardInfo.CompanyNames?.valueArray[0]?.content}
+                                </td>
+                            </tr>
+                            <tr>
+                                <td className='py-2 whitespace-nowrap text-sm text-gray-500'>
+                                    Job title
+                                </td>
+                                <td className='px-2 py-2 whitespace-normal text-sm text-gray-500'>
+                                    {cardInfo.JobTitles?.valueArray[0]?.content}
+                                </td>
+                            </tr>
+                            <tr>
+                                <td className='py-2 whitespace-nowrap text-sm text-gray-500'>
+                                    Contact name
+                                </td>
+                                <td className='px-2 py-2 whitespace-normal text-sm text-gray-500'>
+                                    {`${cardInfo.ContactNames?.valueArray[0]?.content}`}
+                                </td>
+                            </tr>
+                            <tr>
+                                <td className='py-2 whitespace-nowrap text-sm text-gray-500'>
+                                    Department
+                                </td>
+                                <td className='px-2 py-2 whitespace-normal text-sm text-gray-500'>
+                                    {cardInfo.Departments?.valueArray[0]?.content}
+                                </td>
+                            </tr>
+                            <tr>
+                                <td className='py-2 whitespace-nowrap text-sm text-gray-500'>
+                                    Email
+                                </td>
+                                <td className='px-2 py-2 whitespace-normal text-sm text-gray-500'>
+                                    {cardInfo.Emails?.valueArray[0]?.content}
+                                </td>
+                            </tr>
+                            <tr>
+                                <td className='py-2 whitespace-nowrap text-sm text-gray-500'>
+                                    Fax
+                                </td>
+                                <td className='px-2 py-2 whitespace-normal text-sm text-gray-500'>
+                                    {cardInfo.Faxes?.valueArray[0]?.content}
+                                </td>
+                            </tr>
+                            <tr>
+                                <td className='py-2 whitespace-nowrap text-sm text-gray-500'>
+                                    MobilePhone
+                                </td>
+                                <td className='px-2 py-2 whitespace-normal text-sm text-gray-500'>
+                                    {cardInfo.MobilePhones?.valueArray[0]?.content}
+                                </td>
+                            </tr>
+                            <tr>
+                                <td className='py-2 whitespace-nowrap text-sm text-gray-500'>
+                                    Work phone
+                                </td>
+                                <td className='px-2 py-2 whitespace-normal text-sm text-gray-500'>
+                                    {cardInfo.WorkPhones?.valueArray[0]?.content}
+                                </td>
+                            </tr>
+                            <tr>
+                                <td className='py-2 whitespace-nowrap text-sm text-gray-500'>
+                                    Address
+                                </td>
+                                <td className='px-2 py-2 whitespace-normal text-sm text-gray-500'>
+                                    {cardInfo.Addresses?.valueArray[0]?.content}
+                                </td>
+                            </tr>
+                            <tr>
+                                <td className='py-2 whitespace-nowrap text-sm text-gray-500'>
+                                    Website
+                                </td>
+                                <td className='px-2 py-2 whitespace-normal text-sm text-gray-500'>
+                                    {cardInfo.Websites?.valueArray[0]?.content}
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
                 </div>
             )}
         </div>
