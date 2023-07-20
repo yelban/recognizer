@@ -93,7 +93,7 @@ function FileUpload() {
                 />
                 <button
                     onClick={handleButtonClick}
-                    className='bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded w-[150px]'
+                    className='bg-blue-500 hover:bg-blue-700 text-white font-bold text-lg py-2 px-4 rounded w-[150px]'
                     type='button'>
                     Scan Card
                 </button>
@@ -102,7 +102,7 @@ function FileUpload() {
                     disabled={!fileSelected}
                     className={`${
                         fileSelected ? 'bg-green-500 hover:bg-green-700' : 'bg-gray-300'
-                    } text-white font-bold py-2 px-4 rounded ml-2 w-[150px]`}
+                    } text-white font-bold text-lg py-2 px-4 rounded ml-2 w-[150px]`}
                     type='button'>
                     Recognize
                 </button>
